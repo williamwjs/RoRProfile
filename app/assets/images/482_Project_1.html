@@ -1,0 +1,511 @@
+<html>
+<head>
+<title>Project 1 -- multi-threaded programming</title>
+</head>
+<body>
+<h1>Project 1 -- multi-threaded programming</h1>
+Worth: 4 points<br>
+Assigned: Tuesday, January 13, 2015<br>
+Due: 11:59 pm, Wednesday, January 28, 2015
+
+<h2 id="overview">1. Overview</h2>
+
+<p>
+This project will give you experience writing multi-threaded
+programs using monitors.  In this project, you will write a simple
+concurrent program that schedules disk requests.  This concurrent program
+will use a thread library that we provide.
+
+<p>
+<strong><font color="#FF0000">This project is to be done
+individually.</font></strong>
+
+<h2>2. Thread library interface</h2>
+
+<p>
+This section describes the interface that the thread library and
+infrastructure provide to applications.  You will write a multi-threaded
+program that uses this interface.  The interface consists of four classes:
+<tt>cpu</tt>, <tt>thread</tt>, <tt>mutex</tt>, and <tt>cv</tt>, which are
+declared in <a href=cpu.h><tt>cpu.h</tt></a>,
+<a href=thread.h><tt>thread.h</tt></a>,
+<a href=mutex.h><tt>mutex.h</tt></a>, and <a href=cv.h><tt>cv.h</tt></a>
+(do not modify these files).  For convenience,
+<a href=thread.h><tt>thread.h</tt></a> includes the other header files.
+
+<p>
+To use the thread library, programs <tt>#include
+<a href=thread.h>thread.h</a></tt> and link with
+<a href=libcpu.a><tt>libcpu.a</tt></a> and
+<a href=thread.o><tt>thread.o</tt></a>.
+
+<h3>2.1. <tt>cpu</tt> class</h3>
+
+<p>
+The <tt>cpu</tt> class is declared in <a href=cpu.h><tt>cpu.h</tt></a> and
+is used mainly by the thread library.  The only part used by applications
+is the <tt>cpu::boot</tt> function:
+
+<pre>
+    static void boot(thread_startfunc_t func, void *arg, unsigned int deterministic);
+</pre>
+
+<p>
+<tt>cpu::boot</tt> starts the thread library and creates the initial
+thread, which is initialized to call the function pointed to by
+<tt>func</tt> with the single argument <tt>arg</tt>.  A user program should
+call <tt>cpu::boot</tt> exactly once (before calling any other thread functions).
+On success, <tt>cpu::boot</tt> does not return.
+
+<p>
+<tt>deterministic</tt> specifies if the thread library should be deterministic
+or not.  Setting <tt>deterministic</tt> to zero makes the scheduling of threads
+non-deterministic, i.e., different runs may generate different results.
+Setting <tt>deterministic</tt> to a non-zero value forces the scheduling of
+threads to be deterministic, i.e., a program will generate the same
+results if it is run with the same value for <tt>deterministic</tt> (different
+non-zero values for <tt>deterministic</tt> will lead to different results).
+
+<p>
+Note that <tt>cpu::boot</tt> is a <tt>static</tt> member function and is
+invoked on the <tt>cpu</tt> class (not on an instance of the <tt>cpu</tt>
+class).
+
+<h3>2.2. <tt>thread</tt> class</h3
+
+<p>
+The <tt>thread</tt> class is declared in
+<a href=thread.h><tt>thread.h</tt></a>.  All functions throw
+the <tt>std::runtime_error</tt> exception on an error.
+
+<p>
+The constructor is used to create a new thread.  When the newly created
+thread starts, it will call the function pointed to by <tt>func</tt> and
+pass it the single argument <tt>arg</tt>.
+
+<pre>
+    thread(thread_startfunc_t func, void *arg);
+</pre>
+
+<p>
+<tt>join</tt> causes the current thread to block until the specified thread
+has exited.  If the specified thread has already exited, <tt>join</tt>
+returns immediately.
+
+<pre>
+    void join();
+</pre>
+
+<h3>2.3. <tt>mutex</tt> class</h3
+
+<p>
+The <tt>mutex</tt> class is declared in
+<a href=mutex.h><tt>mutex.h</tt></a>.  All functions throw an
+<tt>std::runtime_error</tt> exception on an error.
+
+<p>
+The constructor is used to create a new mutex.
+
+<pre>
+    mutex();
+</pre>
+
+<p>
+<tt>lock</tt> atomically waits for the mutex to be free and
+acquires it for the current thread.
+
+<pre>
+    void lock();
+</pre>
+
+<p>
+<tt>unlock</tt> releases the mutex.
+
+<pre>
+    void unlock();
+</pre>
+
+<h3>2.4. <tt>cv</tt> class</h3
+
+<p>
+The <tt>cv</tt> class is declared in <a href=cv.h><tt>cv.h</tt></a>.  All
+functions throw an <tt>std::runtime_error</tt> exception on an error.
+
+<p>
+The constructor is used to create a new condition variable.
+
+<pre>
+    cv();
+</pre>
+
+<p>
+<tt>wait</tt> atomically releases mutex <tt>m</tt> and waits on the
+condition queue.  When the thread is signalled, <tt>wait</tt> will
+re-acquire the mutex before returning.
+
+<pre>
+    void wait(mutex& m);
+</pre>
+
+<p>
+<tt>signal</tt> signals one of the threads on the condition queue.
+
+<pre>
+    void signal();
+</pre>
+
+<p>
+<tt>broadcast</tt> signals all of the threads on the condition queue.
+
+<pre>
+    void broadcast();
+</pre>
+
+<h3 id="example">2.5. Example program</h3>
+
+<p>
+Here is a short program that uses threads.
+
+<hr>
+<pre>
+#include &lt;iostream&gt;
+#include "thread.h"
+
+using namespace std;
+
+mutex mutex1;
+cv cv1;
+
+int child_done = 0;		// global variable; shared between the two threads.
+
+void child(void *a)
+{
+    char *message = (char *) a;
+    mutex1.lock();
+    cout << "child run with message " << message << ", setting child_done = 1\n";
+    child_done = 1;
+    cv1.signal();
+    mutex1.unlock();
+}
+
+void parent(void *a)
+{
+    intptr_t arg = (intptr_t) a;
+    cout << "parent called with arg " << arg << endl;
+    thread t1 ((thread_startfunc_t) child, (void *) "test message");
+    mutex1.lock();
+    while (!child_done) {
+        cout << "parent waiting for child to run\n";
+        cv1.wait(mutex1);
+    }
+    cout << "parent finishing" << endl;
+    mutex1.unlock();
+}
+
+int main()
+{
+    cpu::boot((thread_startfunc_t) parent, (void *) 100, 0);
+}
+</pre>
+
+<hr>
+
+<p>
+Here are the <strong>two</strong> possible outputs the program can generate.
+
+<hr>
+
+<pre>
+parent called with arg 100
+parent waiting for child to run
+child run with message test message, setting child_done = 1
+parent finishing
+No runnable threads.  Exiting.
+<hr>
+parent called with arg 100
+child run with message test message, setting child_done = 1
+parent finishing
+No runnable threads.  Exiting.
+</pre>
+<hr>
+
+<h2 id="diskscheduler">3. Disk scheduler</h2>
+
+<p>
+Your task for this project is to write a concurrent program that
+issues and services disk requests.
+
+<p>
+The disk scheduler in an operating system receives and schedules requests
+for disk I/Os.  Threads issue disk requests by queueing them at the disk
+scheduler.  The disk scheduler queue can contain at most a specified number
+of requests (<tt>max_disk_queue</tt>); threads must wait if the queue is full.
+
+<p>
+Your program should start by creating a specified number of requester threads
+to issue disk requests and one thread to service disk requests.  Each
+requester thread should issue a series of requests for disk tracks (specified
+in its input file).  Each request is <strong>synchronous</strong>;
+a requester thread must wait until the servicing thread finishes handling
+that requester's last request before that requester issues its next
+request.  A requester thread finishes after all the requests in its input
+file have been serviced.
+
+<p>
+Requests in the disk queue are <strong>not</strong> necessarily serviced in
+FIFO order.  Instead, the service thread handles disk requests in SSTF
+order (shortest seek time first).  That is, the next request it services is
+the request that is closest to its current track.  The disk is initialized
+with its current track as 0.
+
+<p>
+Keep the disk queue as full as possible; your service thread should only
+handle a request when the disk queue has the largest possible number of
+requests.  This gives the service thread the largest number of requests to
+choose from, which in turn helps minimize average seek distance.  Note that
+the value of "the largest possible number of requests" varies depending on
+how many request threads are still active.  When at least
+<tt>max_disk_queue</tt> requester threads are alive, the largest possible
+number of requests in the queue is equal to <tt>max_disk_queue</tt>.  When
+fewer than <tt>max_disk_queue</tt> requester threads are alive, the largest
+number of requests in the queue is equal to the number of living requester
+threads.  A requester is considered to be active from the time the program
+starts until all its requests have been serviced.
+
+<h3 id="input">3.1. Input</h3>
+
+<p>
+Your program will be called with several command-line arguments.  The first
+argument specifies the maximum number of requests that the disk queue can
+hold.  The rest of the arguments specify a list of input files (one input file
+per requester).  I.e., the input file for requester r is argv[r+2], where
+0 <= r < (number of requesters).  The number of threads making disk requests
+should be deduced from the number of input files specified.
+
+<p>
+The input file for each requester contains that requester's series of requests.
+Each line of the input file specifies the track number of the request (0 to
+999).  You may assume that input files are formatted correctly.  Open each
+input file read-only (<strong>use <tt>ifstream</tt> rather than
+<tt>fstream</tt></strong>).
+
+<h3 id="output">3.2. Output</h3>
+
+<p>
+After issuing a request, a requester thread should execute the following
+code (note the space characters in the strings):
+<pre>
+<tt>cout << "requester " << requester << " track " << track << endl;</tt>
+</pre>
+
+<p>
+A request is available to be serviced when the requester thread prints this
+line.
+
+<p>
+After servicing a request, the service thread should execute the following
+code (note the space characters in the strings):
+<pre>
+cout << "service requester " << requester << " track " << track << endl;
+</pre>
+
+<p>
+A request is considered to be off the queue when the service thread
+prints this line.
+
+<p>
+Your program should not generate any other output.
+
+<p>
+The console is shared between the different threads, so your
+program's calls to <tt>cout</tt> must be protected by a monitor lock to
+prevent intermingling output from multiple threads.
+
+<h3 id="exampleio">3.3. Example input/output</h3>
+
+<p>
+Here is an example set of input files (disk.in0 - disk.in4).
+
+<table border=1>
+<thead>
+    <tr>
+        <th><a href=disk.in0>disk.in0</a></th>
+        <th><a href=disk.in1>disk.in1</a></th>
+        <th><a href=disk.in2>disk.in2</a></th>
+        <th><a href=disk.in3>disk.in3</a></th>
+        <th><a href=disk.in4>disk.in4</a></th>
+    </tr>
+</thead>
+<tbody>
+    <tr>
+	<td>785<br>53</td> <td>350<br>914</td> <td>827<br>567</td> <td>302<br>230</td> <td>631<br>11</td>
+    </tr>
+</tbody>
+</table>
+
+<p>
+Here is one of many possible correct outputs from running the disk
+scheduler with the following command (the final line of the output is
+produced by the thread library, not the disk scheduler):
+
+<pre>
+disk 3 disk.in0 disk.in1 disk.in2 disk.in3 disk.in4
+<hr>
+requester 2 track 827
+requester 1 track 350
+requester 3 track 302
+service requester 3 track 302
+requester 4 track 631
+service requester 1 track 350
+requester 0 track 785
+service requester 4 track 631
+requester 3 track 230
+service requester 0 track 785
+requester 1 track 914
+service requester 2 track 827
+requester 4 track 11
+service requester 1 track 914
+requester 0 track 53
+service requester 3 track 230
+requester 2 track 567
+service requester 0 track 53
+service requester 4 track 11
+service requester 2 track 567
+No runnable threads.  Exiting.
+<hr>
+</pre>
+
+<h2 id="logistics">4. Project logistics</h2>
+
+<p>
+Write your disk scheduler in C++ on Linux.  Use <tt>g++ 4.8.2</tt> to compile
+your programs.  To use <tt>g++ 4.8.2</tt> on CAEN
+computers, put the following command in your startup file (e.g.,
+<tt>~/.profile</tt>):
+
+<pre>
+module load gcc
+module load gdb/7.5.1
+</pre>
+
+<!--
+<p>
+You should also set the <tt>LD_BIND_NOW</tt> environment variable to 1.
+This works around an apparent incompatibility between the thread library
+and the Linux dynamic linker.  Add the following line to your
+<tt>~/.profile</tt>:
+
+<pre>
+export LD_BIND_NOW=1
+</pre>
+-->
+
+<p>
+You may use any functions included in the standard C++ library (including
+the STL), except for C++11 threads.  You should not use any libraries other
+than the standard C++ library (e.g., pthreads).  To compile your disk
+scheduler (e.g., <tt>disk.cc</tt>), run:
+
+<pre>
+g++ thread.o disk.cc libcpu.a -ldl -pthread -std=c++11
+</pre>
+
+<p>
+You may add options <tt>-g</tt> and <tt>-Wall</tt> for debugging and
+<tt>-o</tt> to name the executable.
+
+<p>
+Your disk scheduler code may be in multiple files.
+Each file name must end with <tt>.cc</tt>, <tt>.cpp</tt>, or <tt>.h</tt>
+and must not start with <tt>test</tt>.
+
+<p>
+We have created a private <a href="https://github.com/eecs482">github</a>
+repository for each student
+(<tt>eecs482/&ltuniqname&gt.1</tt>)
+Initialize
+your local repository by cloning the (empty) repositories from github, e.g.,
+
+<pre>
+git clone git@github.com:eecs482/uniqname.1
+</pre>
+
+<h2 id="grading">5. Grading, auto-grading, and formatting</h2>
+
+<p>
+To help you validate your programs, your submissions will be graded
+automatically, and the results will be provided to you.  You may then
+continue to work on the project and re-submit.  The results from the
+auto-grader will not be very illuminating; they won't tell you where your
+problem is or give you the test inputs.  The main purpose of the
+auto-grader is to help you know to keep working on your project (rather
+than thinking it's perfect and ending up with a 0).  The best way to debug
+your program is to generate your own test inputs, understand the
+constraints on correct answers for these inputs, and determine if your
+program's output obeys these constraints.  This is also one of the best
+ways to learn the concepts in the project.
+
+<p>
+You may submit your program as many times as you like.  However, only the
+feedback from the first submission of each day will be provided to you.
+Later submissions on that day will be graded and cataloged, but the results
+will not be provided to you.  See the <a href=../faq.html#limit>FAQ</a> for
+why we use this policy.
+
+<p>
+In addition to this one-per-day policy, you will be given 3 bonus submissions
+that also provide feedback.  These will be used automatically--any submission
+you make after the first one of that day will use one of your bonus
+submissions.  After your 3 bonus submissions are used up, the system will
+continue to provide 1 feedback per day.
+
+<p>
+Because you are writing concurrent programs, the auto-grader may return
+non-deterministic results.  In particular, test cases 5-8 are
+non-deterministic.
+
+<p>
+Because your programs will be auto-graded, you must be careful to follow the
+exact rules in the project description.  In particular:
+
+<li>Your program should print only the two items specified in
+<a href="#output">Section 3.2</a>.
+
+<li>Your program should expect several command-line
+arguments, with the first being <tt>max_disk_queue</tt> and the others
+specifying the list of input files for the requester threads.
+
+<li>Do not modify or rename the header files provided in this handout.
+
+<h2 id="submission">6. Turning in the project</h2>
+
+<p>
+<a href=../submit.php?1>Submit</a> the following file for your disk scheduler:
+
+<ul>
+<li>C++ files for your disk scheduler.  File names should end in
+<tt>.cc</tt>, <tt>.cpp</tt>, or <tt>.h</tt> and must not start with <tt>test</tt>.
+Do not submit the files provided in this handout.
+</ul>
+
+</ul>
+
+<p>
+The official time of submission for your project will be the time of
+your last submission.  Submissions after the due date will
+automatically use up your late days; if you have no late days left,
+late submissions will not be counted.
+
+<h2 id="files">7. Files included in this handout</h2>
+
+<ul>
+<li><a href=cpu.h><tt>cpu.h</a>
+<li><a href=cv.h><tt>cv.h</tt></a>
+<li><a href=libcpu.a><tt>libcpu.a</tt></a>
+<li><a href=mutex.h><tt>mutex.h</tt></a>
+<li><a href=thread.h><tt>thread.h</tt></a>
+<li><a href=thread.o><tt>thread.o</tt></a>
+</ul>
+
+</body>
+</html>

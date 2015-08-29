@@ -1,14 +1,73 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-  <title>RoRProfile</title>
+  <meta name="keywords" content="Jiashuo Wang, University of Michigan, Ann Arbor, SJTU, Umich, Biography" />
+  <meta name="description" content="Biography of Jiashuo Wang" />
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <title>Biography --- Jiashuo WANG</title>
+  <link rel="shortcut icon" href="UMicon.ico" >
   <%= stylesheet_link_tag    'application', media: 'all', 'data-turbolinks-track' => true %>
   <%= javascript_include_tag 'application', 'data-turbolinks-track' => true %>
   <%= csrf_meta_tags %>
 </head>
 <body>
-
-<%= yield %>
-
+<div id="wrapper">
+  <div id="header">
+    <div id="logo">
+      <h1><a href="index.html">Jiashuo Wang   </a></h1>
+      <!-- <p> design by <a href="http://www.freecsstemplates.org/">Free CSS Templates</a></p> -->
+    </div>
+    <div id="search">
+      <form method="get" action="">
+        <fieldset>
+          <input type="text" name="s" id="search-text" size="15" value="enter keywords here..." />
+          <input type="submit" id="search-submit" value="GO" />
+        </fieldset>
+      </form>
+    </div>
+  </div>
+  <!-- end #header -->
+  <div id="menu">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li class="current_page_item"><a href="Biography.html">Biography</a></li>
+      <li><a href="Projects.html">Projects</a></li>
+      <li><a href="Photos.html">Photos</a></li>
+      <li><a href="Contact.html">Contact</a></li>
+    </ul>
+  </div>
+  <div id="splash">&nbsp;</div>
+  <!-- end #menu -->
+  <div id="page">
+    <div id="page-bgtop">
+      <div id="page-bgbtm">
+        <div id="content">
+          <%= yield %>
+          <div style="clear: both;">&nbsp;</div>
+        </div>
+        <!-- end #content -->
+        <div id="sidebar">
+          <ul>
+            <li>
+              <h2>Link</h2>
+              <ul>
+                <li><a href="https://www.linkedin.com/in/jiashuowilliamwang" target="_blank">LinkedIn</a></li>
+                <li><a href="Jiashuo Wang Resume.pdf" target="_blank">Resume</a></li>
+                <li><a href="Jiashuo Wang Cover Letter.pdf" target="_blank">Cover Letter</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+        <!-- end #sidebar -->
+        <div style="clear: both;">&nbsp;</div>
+      </div>
+    </div>
+  </div>
+  <!-- end #page -->
+</div>
+<div id="footer">
+  <p>&copy; Jiashuo Wang, 2015.09</p>
+</div>
+<!-- end #footer -->
 </body>
 </html>
