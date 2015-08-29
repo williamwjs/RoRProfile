@@ -1,0 +1,16 @@
+<p id="notice"><%= notice %></p>
+
+<% @places.each do |place| %>
+    <h1><%= link_to place.name, place.place_url, target: '_blank' %></h1>
+    <td><%= place.role %></td>,
+    <td><%= place.start_date %></td> -
+    <td><%= place.end_date %></td>
+    <br>
+    <td><%= link_to 'Show', place %></td>|
+    <td><%= link_to 'Edit', edit_place_path(place) %></td>|
+    <td><%= link_to 'Destroy', place, method: :delete, data: { confirm: 'Are you sure?' } %></td>
+<% end %>
+
+<br>
+
+<%= link_to 'New Place', new_place_path %>
